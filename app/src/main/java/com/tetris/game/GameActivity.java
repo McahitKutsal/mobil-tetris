@@ -6,7 +6,6 @@ import androidx.core.content.ContextCompat;
 
 import android.annotation.SuppressLint;
 import android.content.DialogInterface;
-import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.media.MediaPlayer;
 import android.os.Bundle;
@@ -18,15 +17,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.os.Bundle;
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.provider.Settings;
 import android.util.Log;
-import android.widget.Toast;
-
-import java.util.ArrayList;
-import java.util.List;
 
 import camp.visual.gazetracker.GazeTracker;
 import camp.visual.gazetracker.callback.GazeCallback;
@@ -34,12 +25,11 @@ import camp.visual.gazetracker.callback.InitializationCallback;
 import camp.visual.gazetracker.constant.InitializationErrorType;
 import camp.visual.gazetracker.filter.OneEuroFilterManager;
 import camp.visual.gazetracker.gaze.GazeInfo;
-import camp.visual.gazetracker.state.ScreenState;
 
 public class GameActivity extends AppCompatActivity implements View.OnClickListener {
 
-    GazeTracker gazeTracker = null;
-
+    //Gerekli değişkenlerin tanımlanması
+    private GazeTracker gazeTracker = null;
     public static GameState gameState = new GameState(24, 20, TetrisFigureType.getRandomTetrisFigure());
     private TetrisView tetrisView;
     private ImageButton left;
@@ -50,9 +40,9 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     private TextView score;
     private Handler handler;
     private Runnable loop;
-    private int delayFactor;
-    private int delay;
-    private int delayLowerLimit;
+    private float delayFactor;
+    private float delay;
+    private float delayLowerLimit;
     private int tempScore;
     MediaPlayer tetris_sound;
     private float[] x_array = {500,500,500,500,500};
@@ -65,39 +55,31 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game);
 
-        // set sound during playing
+        // Media Player ayarları yapılır ve müzik başlatılır.
         tetris_sound= MediaPlayer.create(GameActivity.this, R.raw.tetris);
-        tetris_sound.setLooping(true); // Set looping
+        tetris_sound.setLooping(true);
         tetris_sound.setVolume(100, 100);
         tetris_sound.start();
 
-        // reset view / gamestate after restart in order to play again
+        // Oyun durumu sıfırlanır.
         gameState.reset();
 
-        // hide Action Bar
+        // Uygulamalarda default olarak gelen toolbarın gizlenmesi
         getSupportActionBar().hide();
 
-        // score for intent to GameOver activity
+        // Skor değişkenine 0 atanır.
         tempScore = 0;
 
-        // config the used views
+        // Tasarım ile değişkenlerin bağlantısının yapılması
         tetrisView = findViewById(R.id.tetris_view);
-
-        // button move left
         left = findViewById(R.id.button_left);
-
-        // button turn
         turn = findViewById(R.id.button_turn);
-
-        // button turn right
         right = findViewById(R.id.button_right);
-
         pause = findViewById(R.id.button_pause);
         score = findViewById(R.id.game_score);
-
         eye_icon = findViewById(R.id.eye_icon);
 
-        // set dark / light mode colors to buttons
+        //Gece modu ve gündüz modu için tema renk ayarlarının yapılması
         int nightModeFlags =
                 getApplicationContext().getResources().getConfiguration().uiMode &
                         Configuration.UI_MODE_NIGHT_MASK;
@@ -124,29 +106,31 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
         }
 
 
-        // set onclicklisteners
+        // Butonlar için tıklama fonksiyonları atanır.
         left.setOnClickListener(this);
         turn.setOnClickListener(this);
         right.setOnClickListener(this);
         pause.setOnClickListener(this);
 
+        //Oyunun hızını ayarlayan değişkenlere atama yapılması
         delay = 500;
         delayLowerLimit = 200;
-        delayFactor = 2;
+        delayFactor = 1.25f;
 
-        // get the intent with the difficulty information from main activity
         Intent i = getIntent();
         int difficulty = i.getIntExtra("difficulty", 0);
 
-        // set the speed of the game based on the difficulty
+        // Oyunun zorluğunu ayarlayan delay kullancının seçimine göre düzenlenir
         if (difficulty == 2) {
             delay = delay/delayFactor;
         } else {
             delay = delay * delayFactor;
         }
 
+        // Göz tarama başlatılır
         initGaze();
-        
+
+        // Oyunun akış döngüsü tanımlanır.
         handler = new Handler(Looper.getMainLooper());
         loop = new Runnable() {
             public void run() {
@@ -175,20 +159,21 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
                             Log.i("SeeSo", "Yukarı");
                         }
                         if(down==x_array.length){
+                            // Kullanıcı aşağıya bakınca gelen obje döndürülür.
                             gameState.rotateFallingTetrisFigureAntiClock();
                             Log.i("SeeSo", "Aşağı");
                         }
                         if(right==x_array.length){
+                            // Kullanıcı sağa bakınca gelen obje sağa gider.
                             gameState.moveFallingTetrisFigureRight();
                             Log.i("SeeSo", "Sağa");
                         }
                         if(left==x_array.length){
+                            // Kullanıcı sola bakınca gelen obje sola gider.
                             gameState.moveFallingTetrisFigureLeft();
                             Log.i("SeeSo", "Sola");
                         }
-
-
-
+                        // Objenin aşağıya hareketi sağlanır.
                         boolean success = gameState.moveFallingTetrisFigureDown();
                         if (!success) {
                             gameState.paintTetrisFigure(gameState.falling);
@@ -196,25 +181,28 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
 
                             gameState.pushNewTetrisFigure(TetrisFigureType.getRandomTetrisFigure());
 
-                            // make game faster
+                            // Skor arttıkça oyun hızlandırılır.
                             if (gameState.score % 10 == 9 && delay >= delayLowerLimit) {
                                 delay = delay / delayFactor + 1;
                             }
                             gameState.incrementScore();
 
-                            // update score
+                            // Skor arttılır ve güncellenir
                             ++tempScore;
                             String stringScore = Integer.toString(gameState.score);
                             score.setText(stringScore);
 
 
                         }
-                       tetrisView.invalidate();
+
+                        tetrisView.invalidate();
                     }
-                    handler.postDelayed(this, delay);
+                    handler.postDelayed(this, (long) delay);
                 } else {
+                    //Oyun bitince müzik durduruluyor.
                     tetris_sound.stop();
 
+                    //Dialog oluşturulur ve skor ekrana yazdırılır.
                     AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(GameActivity.this);
                     alertDialogBuilder.setTitle("Oyun Bitti");
                     alertDialogBuilder.setIcon(R.drawable.ic_game_over);
@@ -227,7 +215,7 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
                             Intent i = new Intent(getBaseContext(), MainActivity.class);
                             startActivity(i);
 
-                  }
+                        }
                     });
                     AlertDialog alert = alertDialogBuilder.create();
                     alert.setCanceledOnTouchOutside(false);
@@ -243,6 +231,7 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
             }
 
         };
+        // Oyunun akış döngüsü başlatılır.
         loop.run();
 
     }
@@ -252,27 +241,30 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View action) {
         if (action == left) {
 
-            // change color when click
+            //Sol butona tıklayınca sola hareket ettirilir.
             gameState.moveFallingTetrisFigureLeft();
 
         } else if (action == right) {
 
-            // change color when click
+            //Sağ butona tıklayınca sağa hareket ettirilir.
             gameState.moveFallingTetrisFigureRight();
 
         } else if (action == turn) {
 
-            // change color when click
+            //Döndürme butona tıklayınca obje döndürülür.
             gameState.rotateFallingTetrisFigureAntiClock();
 
         } else if (action == pause) {
+
             if (gameState.status) {
+                //Pause butonuna tıklayınca oyun ve müzik durdurulur.
                 if (gameState.pause) {
                     gameState.pause = false;
                     pause.setText(R.string.pause);
                     tetris_sound.start();
 
                 } else {
+                    //Oyun durmuşken pause butonuna tıklayınca oyun ve müzik devam ettirilir.
                     pause.setText(R.string.play);
                     gameState.pause = true;
                     tetris_sound.pause();
@@ -285,6 +277,8 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onPause() {
         super.onPause();
+        //Oyundan çıkılınca oyun, göz takibi ve müzik durdurulur.
+
         pause.setText(R.string.play);
         gameState.pause = true;
         if (tetris_sound.isPlaying()) {
@@ -302,21 +296,16 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onResume() {
         super.onResume();
+        //Oyun devam ettirince göz takibi başlatılır.
         if(gazeTracker!=null && !gazeTracker.isTracking()){
             gazeTracker.startTracking();
         }
 
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-/*
-        GazeTracker.deinitGazeTracker(this.gazeTracker);
-        this.gazeTracker = null;*/
-    }
 
     private void initGaze() {
+        //Göz takip kütüphanesinin lisansının tanımlanması ve tanımlanması
         String licenseKey = "dev_41qcrirm06ytujj97umrc5c5fog9yz4w16er2xys";
         GazeTracker.initGazeTracker(GameActivity.this, licenseKey, initializationCallback);
     }
@@ -324,6 +313,7 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     private InitializationCallback initializationCallback = new InitializationCallback() {
         @Override
         public void onInitialized(GazeTracker gazeTracker, InitializationErrorType error) {
+            //Göz takip kütüphanesinin sorunsuz başlaması için kontrol yapılır.
             if (gazeTracker != null) {
                 initSuccess(gazeTracker);
             } else {
@@ -336,17 +326,18 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
 
 
     private void initSuccess(GazeTracker gazeTracker) {
+        //Başarılı olunca tanımlama yapılır.
         this.gazeTracker = gazeTracker;
         this.gazeTracker.setGazeCallback(gazeCallback);
         this.gazeTracker.startTracking();
     }
+    //Göz takip için filtre tanımlanır.
     private OneEuroFilterManager oneEuroFilterManager = new OneEuroFilterManager(2);
 
     public GazeCallback gazeCallback = new GazeCallback() {
-
         @Override
         public void onGaze(GazeInfo gazeInfo) {
-
+            //Göz takibinden gelen x ve y değerleri filtreden geçirdikten sonra diziye aktarılır.
             if (oneEuroFilterManager.filterValues(gazeInfo.timestamp, gazeInfo.x, gazeInfo.y)) {
                 float[] filteredValues = oneEuroFilterManager.getFilteredValues();
                 float x = filteredValues[0];
@@ -363,11 +354,13 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
                 y_array[0] = y;
 
                 if(!focusable){
+                    //Eğer kullancı ekranın içerisine bakıyorsa göz ikonu yeşil yapılır.
                     focusable = true;
                     eye_icon.setColorFilter(ContextCompat.getColor(GameActivity.this, R.color.green), android.graphics.PorterDuff.Mode.SRC_IN);
                 }
             }else{
                 if(focusable){
+                    //Eğer kullancı ekranın dışına bakıyorsa göz ikonu mavi yapılır.
                     focusable = false;
                     eye_icon.setColorFilter(ContextCompat.getColor(GameActivity.this, R.color.ocean), android.graphics.PorterDuff.Mode.SRC_IN);
                 }
@@ -377,19 +370,15 @@ public class GameActivity extends AppCompatActivity implements View.OnClickListe
     };
 
     private void initFail(InitializationErrorType error) {
+        //Göz takip kütüphanesinde hata olur ve başlatılamazsa hata log atılır.
         String err = "";
         if (error == InitializationErrorType.ERROR_INIT) {
-            // When initialization is failed
             err = "Initialization failed";
         } else if (error == InitializationErrorType.ERROR_CAMERA_PERMISSION) {
-            // When camera permission doesn not exists
             err = "Required permission not granted";
         } else {
-            // Gaze library initialization failure
-            // It can ba caused by several reasons(i.e. Out of memory).
             err = "init gaze library fail";
         }
         Log.w("SeeSo", "error description: " + err);
-        Toast.makeText(GameActivity.this,"error description: " + err,Toast.LENGTH_LONG).show();
     }
 }
